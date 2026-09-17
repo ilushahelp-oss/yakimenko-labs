@@ -94,7 +94,7 @@ function initMobileNav() {
  * 4. Animated Metric Counters
  */
 function initMetricCounters() {
-  const metricElements = document.querySelectorAll('.metric-number');
+  const metricElements = document.querySelectorAll('.metric-number, .mini-stat-num, .platform-metric');
   if (!metricElements.length) return;
 
   const observer = new IntersectionObserver((entries, obs) => {
