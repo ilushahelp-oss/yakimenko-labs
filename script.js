@@ -1,236 +1,235 @@
-// ===========================
-// Navigation Scroll Effect
-// ===========================
-const nav = document.getElementById('nav');
-let lastScrollY = window.scrollY;
+/**
+ * Yakimenko Labs — Interactive Engine
+ * Zero dependencies, pure vanilla ES6+
+ */
 
-function handleNavScroll() {
-    const currentScrollY = window.scrollY;
-    
-    if (currentScrollY > 50) {
-        nav.classList.add('scrolled');
-    } else {
-        nav.classList.remove('scrolled');
-    }
-    
-    lastScrollY = currentScrollY;
+document.addEventListener('DOMContentLoaded', () => {
+  initCardGlow();
+  initHeaderScroll();
+  initMobileNav();
+  initMetricCounters();
+  initClipboardCopy();
+  initSmoothScroll();
+  initExternalLinks();
+});
+
+/**
+ * 1. Interactive Radial Mouse Glow on Cards
+ */
+function initCardGlow() {
+  const cards = document.querySelectorAll('.glow-card');
+
+  cards.forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      card.style.setProperty('--mouse-x', `${x}px`);
+      card.style.setProperty('--mouse-y', `${y}px`);
+    });
+  });
 }
 
-window.addEventListener('scroll', handleNavScroll, { passive: true });
+/**
+ * 2. Sticky Header Scroll Detection
+ */
+function initHeaderScroll() {
+  const header = document.getElementById('header');
+  if (!header) return;
 
-// ===========================
-// Smooth Scroll for Anchor Links
-// ===========================
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-        const href = this.getAttribute('href');
-        
-        if (href === '#') {
-            return;
+  const handleScroll = () => {
+    if (window.scrollY > 40) {
+      header.classList.add('scrolled');
+    } else {
+      header.classList.remove('scrolled');
+    }
+  };
+
+  window.addEventListener('scroll', handleScroll, { passive: true });
+  handleScroll();
+}
+
+/**
+ * 3. Mobile Navigation Drawer
+ */
+function initMobileNav() {
+  const toggleBtn = document.getElementById('mobileToggle');
+  const drawer = document.getElementById('mobileDrawer');
+  if (!toggleBtn || !drawer) return;
+
+  const toggleDrawer = () => {
+    const isOpen = drawer.classList.contains('open');
+    if (isOpen) {
+      drawer.classList.remove('open');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+    } else {
+      drawer.classList.add('open');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+    }
+  };
+
+  toggleBtn.addEventListener('click', toggleDrawer);
+
+  // Close when clicking navigation link
+  const drawerLinks = drawer.querySelectorAll('a');
+  drawerLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      if (drawer.classList.contains('open')) {
+        toggleDrawer();
+      }
+    });
+  });
+
+  // Close with Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && drawer.classList.contains('open')) {
+      toggleDrawer();
+    }
+  });
+}
+
+/**
+ * 4. Animated Metric Counters
+ */
+function initMetricCounters() {
+  const metricElements = document.querySelectorAll('.metric-number');
+  if (!metricElements.length) return;
+
+  const observer = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        animateNumber(entry.target);
+        obs.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.25 });
+
+  metricElements.forEach(el => observer.observe(el));
+
+  function animateNumber(el) {
+    const rawTarget = el.getAttribute('data-target');
+    const suffix = el.getAttribute('data-suffix') || '';
+    if (!rawTarget) return;
+
+    const targetVal = parseFloat(rawTarget);
+    const isDecimal = rawTarget.includes('.');
+    const duration = 1400; // ms
+    const startTime = performance.now();
+
+    function update(currentTime) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const currentVal = targetVal * ease;
+
+      if (isDecimal) {
+        el.textContent = currentVal.toFixed(1) + suffix;
+      } else {
+        el.textContent = Math.floor(currentVal) + suffix;
+      }
+
+      if (progress < 1) {
+        requestAnimationFrame(update);
+      } else {
+        el.textContent = rawTarget + suffix;
+      }
+    }
+
+    requestAnimationFrame(update);
+  }
+}
+
+/**
+ * 5. One-Click Clipboard Copy with Toast Feedback
+ */
+function initClipboardCopy() {
+  const copyButtons = document.querySelectorAll('.copy-btn');
+  const toast = document.getElementById('toast');
+  let toastTimer = null;
+
+  copyButtons.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const email = btn.getAttribute('data-email');
+      if (!email) return;
+
+      try {
+        await navigator.clipboard.writeText(email);
+        showToast(`Copied ${email} to clipboard!`);
+
+        const copyText = btn.querySelector('.copy-text');
+        if (copyText) {
+          const original = copyText.textContent;
+          copyText.textContent = 'Copied!';
+          setTimeout(() => {
+            copyText.textContent = original;
+          }, 2000);
         }
-        
+      } catch (err) {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = email;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast(`Copied ${email} to clipboard!`);
+      }
+    });
+  });
+
+  function showToast(message) {
+    if (!toast) return;
+    const msgEl = toast.querySelector('.toast-msg');
+    if (msgEl) msgEl.textContent = message;
+
+    toast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+
+    toastTimer = setTimeout(() => {
+      toast.classList.remove('show');
+    }, 3200);
+  }
+}
+
+/**
+ * 6. Smooth Scroll with Sticky Header Offset
+ */
+function initSmoothScroll() {
+  const links = document.querySelectorAll('a[href^="#"]');
+
+  links.forEach(link => {
+    link.addEventListener('click', (e) => {
+      const targetId = link.getAttribute('href');
+      if (!targetId || targetId === '#') return;
+
+      const targetEl = document.querySelector(targetId);
+      if (targetEl) {
         e.preventDefault();
-        const target = document.querySelector(href);
-        
-        if (target) {
-            const navHeight = nav.offsetHeight;
-            const targetPosition = target.offsetTop - navHeight;
-            
-            window.scrollTo({
-                top: targetPosition,
-                behavior: 'smooth'
-            });
-        }
-    });
-});
+        const headerOffset = 80;
+        const elementPosition = targetEl.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
 
-// ===========================
-// Intersection Observer for Fallback Animations
-// (when scroll-driven animations not supported)
-// ===========================
-if (!CSS.supports('animation-timeline: view()')) {
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -100px 0px'
-    };
-
-    const fadeObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '1';
-                entry.target.style.transform = 'translateY(0)';
-            }
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
         });
-    }, observerOptions);
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const animatedElements = document.querySelectorAll('.app-card, .stat-card, .feature-item, .connect-card');
-        
-        animatedElements.forEach(element => {
-            element.style.opacity = '0';
-            element.style.transform = 'translateY(40px)';
-            element.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-            fadeObserver.observe(element);
-        });
+      }
     });
+  });
 }
 
-// ===========================
-// Enhanced External Links
-// ===========================
-document.addEventListener('DOMContentLoaded', () => {
-    const externalLinks = document.querySelectorAll('a[href^="http"]');
-    
-    externalLinks.forEach(link => {
-        if (!link.hasAttribute('rel')) {
-            link.setAttribute('rel', 'noopener noreferrer');
-        }
-        
-        if (!link.hasAttribute('target') && !link.closest('.nav')) {
-            link.setAttribute('target', '_blank');
-        }
-    });
-});
+/**
+ * 7. Security Hardening for External Links
+ */
+function initExternalLinks() {
+  const externalLinks = document.querySelectorAll('a[href^="http"]');
 
-// ===========================
-// Active Nav Link on Scroll
-// ===========================
-const sections = document.querySelectorAll('section[id]');
-const navLinks = document.querySelectorAll('.nav-link');
-
-function updateActiveNavLink() {
-    const scrollY = window.scrollY + nav.offsetHeight + 100;
-
-    sections.forEach(section => {
-        const sectionHeight = section.offsetHeight;
-        const sectionTop = section.offsetTop;
-        const sectionId = section.getAttribute('id');
-        
-        if (scrollY > sectionTop && scrollY <= sectionTop + sectionHeight) {
-            navLinks.forEach(link => {
-                link.classList.remove('active');
-                if (link.getAttribute('href') === `#${sectionId}`) {
-                    link.classList.add('active');
-                }
-            });
-        }
-    });
-}
-
-window.addEventListener('scroll', updateActiveNavLink, { passive: true });
-
-// ===========================
-// Preload Critical Images
-// ===========================
-document.addEventListener('DOMContentLoaded', () => {
-    const founderImage = document.querySelector('.founder-image');
-    
-    if (founderImage && 'loading' in HTMLImageElement.prototype) {
-        founderImage.loading = 'lazy';
+  externalLinks.forEach(link => {
+    if (!link.hasAttribute('rel')) {
+      link.setAttribute('rel', 'noopener noreferrer');
     }
-});
-
-// ===========================
-// Performance: Debounce Scroll Events
-// ===========================
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
+  });
 }
-
-const debouncedNavUpdate = debounce(updateActiveNavLink, 50);
-window.addEventListener('scroll', debouncedNavUpdate, { passive: true });
-
-// ===========================
-// Add Copy Button to Email Links (Enhancement)
-// ===========================
-document.addEventListener('DOMContentLoaded', () => {
-    const emailLinks = document.querySelectorAll('a[href^="mailto:"]');
-    
-    emailLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            const email = link.getAttribute('href').replace('mailto:', '');
-            
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(email).then(() => {
-                    const originalText = link.textContent;
-                    link.textContent = 'Copied!';
-                    
-                    setTimeout(() => {
-                        link.textContent = originalText;
-                    }, 1500);
-                }).catch(() => {
-                    // Silently fail - let default mailto: behavior work
-                });
-            }
-        });
-    });
-});
-
-// ===========================
-// Keyboard Navigation Enhancement
-// ===========================
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        if (document.activeElement) {
-            document.activeElement.blur();
-        }
-    }
-});
-
-// ===========================
-// Performance Monitoring (Dev Only)
-// ===========================
-if ('PerformanceObserver' in window) {
-    try {
-        const perfObserver = new PerformanceObserver((list) => {
-            for (const entry of list.getEntries()) {
-                if (entry.entryType === 'largest-contentful-paint') {
-                    // LCP logged for debugging
-                    console.log('LCP:', entry.startTime);
-                }
-            }
-        });
-        
-        perfObserver.observe({ entryTypes: ['largest-contentful-paint'] });
-    } catch (e) {
-        // Silently fail in unsupported browsers
-    }
-}
-
-// ===========================
-// Reduced Motion Check
-// ===========================
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-if (prefersReducedMotion.matches) {
-    document.documentElement.style.scrollBehavior = 'auto';
-}
-
-// Listen for changes to motion preference
-prefersReducedMotion.addEventListener('change', (e) => {
-    if (e.matches) {
-        document.documentElement.style.scrollBehavior = 'auto';
-    } else {
-        document.documentElement.style.scrollBehavior = 'smooth';
-    }
-});
-
-// ===========================
-// Analytics Ready Event (for future integration)
-// ===========================
-window.addEventListener('load', () => {
-    document.dispatchEvent(new CustomEvent('siteReady', {
-        detail: {
-            timestamp: Date.now(),
-            page: document.title
-        }
-    }));
-});
