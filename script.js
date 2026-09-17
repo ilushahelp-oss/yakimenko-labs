@@ -1,235 +1,141 @@
-/**
- * Yakimenko Labs — Interactive Engine
- * Zero dependencies, pure vanilla ES6+
- */
+(() => {
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const supportsViewTimeline =
+    typeof CSS !== "undefined" &&
+    CSS.supports("(animation-timeline: view()) and (animation-range: entry)");
 
-document.addEventListener('DOMContentLoaded', () => {
-  initCardGlow();
-  initHeaderScroll();
-  initMobileNav();
-  initMetricCounters();
-  initClipboardCopy();
-  initSmoothScroll();
+  initHeader();
+  initMenu();
+  initCopy();
   initExternalLinks();
-});
-
-/**
- * 1. Interactive Radial Mouse Glow on Cards
- */
-function initCardGlow() {
-  const cards = document.querySelectorAll('.glow-card');
-
-  cards.forEach(card => {
-    card.addEventListener('mousemove', (e) => {
-      const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      card.style.setProperty('--mouse-x', `${x}px`);
-      card.style.setProperty('--mouse-y', `${y}px`);
-    });
-  });
-}
-
-/**
- * 2. Sticky Header Scroll Detection
- */
-function initHeaderScroll() {
-  const header = document.getElementById('header');
-  if (!header) return;
-
-  const handleScroll = () => {
-    if (window.scrollY > 40) {
-      header.classList.add('scrolled');
-    } else {
-      header.classList.remove('scrolled');
-    }
-  };
-
-  window.addEventListener('scroll', handleScroll, { passive: true });
-  handleScroll();
-}
-
-/**
- * 3. Mobile Navigation Drawer
- */
-function initMobileNav() {
-  const toggleBtn = document.getElementById('mobileToggle');
-  const drawer = document.getElementById('mobileDrawer');
-  if (!toggleBtn || !drawer) return;
-
-  const toggleDrawer = () => {
-    const isOpen = drawer.classList.contains('open');
-    if (isOpen) {
-      drawer.classList.remove('open');
-      toggleBtn.setAttribute('aria-expanded', 'false');
-      document.body.style.overflow = '';
-    } else {
-      drawer.classList.add('open');
-      toggleBtn.setAttribute('aria-expanded', 'true');
-    }
-  };
-
-  toggleBtn.addEventListener('click', toggleDrawer);
-
-  // Close when clicking navigation link
-  const drawerLinks = drawer.querySelectorAll('a');
-  drawerLinks.forEach(link => {
-    link.addEventListener('click', () => {
-      if (drawer.classList.contains('open')) {
-        toggleDrawer();
-      }
-    });
-  });
-
-  // Close with Escape key
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && drawer.classList.contains('open')) {
-      toggleDrawer();
-    }
-  });
-}
-
-/**
- * 4. Animated Metric Counters
- */
-function initMetricCounters() {
-  const metricElements = document.querySelectorAll('.metric-number');
-  if (!metricElements.length) return;
-
-  const observer = new IntersectionObserver((entries, obs) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        animateNumber(entry.target);
-        obs.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.25 });
-
-  metricElements.forEach(el => observer.observe(el));
-
-  function animateNumber(el) {
-    const rawTarget = el.getAttribute('data-target');
-    const suffix = el.getAttribute('data-suffix') || '';
-    if (!rawTarget) return;
-
-    const targetVal = parseFloat(rawTarget);
-    const isDecimal = rawTarget.includes('.');
-    const duration = 1400; // ms
-    const startTime = performance.now();
-
-    function update(currentTime) {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // Ease out cubic
-      const ease = 1 - Math.pow(1 - progress, 3);
-      const currentVal = targetVal * ease;
-
-      if (isDecimal) {
-        el.textContent = currentVal.toFixed(1) + suffix;
-      } else {
-        el.textContent = Math.floor(currentVal) + suffix;
-      }
-
-      if (progress < 1) {
-        requestAnimationFrame(update);
-      } else {
-        el.textContent = rawTarget + suffix;
-      }
-    }
-
-    requestAnimationFrame(update);
+  initSmoothScroll();
+  if (!reduceMotion && !supportsViewTimeline) {
+    initRevealFallback();
   }
-}
 
-/**
- * 5. One-Click Clipboard Copy with Toast Feedback
- */
-function initClipboardCopy() {
-  const copyButtons = document.querySelectorAll('.copy-btn');
-  const toast = document.getElementById('toast');
-  let toastTimer = null;
+  function initHeader() {
+    const header = document.getElementById("header");
+    if (!header) return;
+    const onScroll = () => {
+      header.classList.toggle("is-scrolled", window.scrollY > 24);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  }
 
-  copyButtons.forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const email = btn.getAttribute('data-email');
-      if (!email) return;
+  function initMenu() {
+    const dialog = document.getElementById("menu");
+    const openBtn = document.getElementById("menu-open");
+    if (!dialog || !openBtn || typeof dialog.showModal !== "function") return;
 
+    openBtn.addEventListener("click", () => {
+      if (!dialog.open) dialog.showModal();
+    });
+
+    dialog.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => {
+        if (dialog.open) dialog.close();
+      });
+    });
+  }
+
+  function initCopy() {
+    const toast = document.getElementById("toast");
+    const msg = toast ? toast.querySelector(".toast-msg") : null;
+    let hideTimer = 0;
+
+    document.querySelectorAll(".copy-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const email = btn.getAttribute("data-email");
+        if (!email) return;
+        const ok = await copyText(email);
+        const original = btn.textContent;
+        btn.textContent = ok ? "Copied" : "Copy failed";
+        announce(ok ? `Copied ${email}` : "Copy failed");
+        window.setTimeout(() => {
+          btn.textContent = original;
+        }, 1800);
+      });
+    });
+
+    async function copyText(value) {
       try {
-        await navigator.clipboard.writeText(email);
-        showToast(`Copied ${email} to clipboard!`);
-
-        const copyText = btn.querySelector('.copy-text');
-        if (copyText) {
-          const original = copyText.textContent;
-          copyText.textContent = 'Copied!';
-          setTimeout(() => {
-            copyText.textContent = original;
-          }, 2000);
-        }
-      } catch (err) {
-        // Fallback for older browsers
-        const textarea = document.createElement('textarea');
-        textarea.value = email;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        showToast(`Copied ${email} to clipboard!`);
+        await navigator.clipboard.writeText(value);
+        return true;
+      } catch {
+        const area = document.createElement("textarea");
+        area.value = value;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.left = "-9999px";
+        document.body.appendChild(area);
+        area.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(area);
+        return ok;
       }
-    });
-  });
-
-  function showToast(message) {
-    if (!toast) return;
-    const msgEl = toast.querySelector('.toast-msg');
-    if (msgEl) msgEl.textContent = message;
-
-    toast.classList.add('show');
-    if (toastTimer) clearTimeout(toastTimer);
-
-    toastTimer = setTimeout(() => {
-      toast.classList.remove('show');
-    }, 3200);
-  }
-}
-
-/**
- * 6. Smooth Scroll with Sticky Header Offset
- */
-function initSmoothScroll() {
-  const links = document.querySelectorAll('a[href^="#"]');
-
-  links.forEach(link => {
-    link.addEventListener('click', (e) => {
-      const targetId = link.getAttribute('href');
-      if (!targetId || targetId === '#') return;
-
-      const targetEl = document.querySelector(targetId);
-      if (targetEl) {
-        e.preventDefault();
-        const headerOffset = 80;
-        const elementPosition = targetEl.getBoundingClientRect().top;
-        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        });
-      }
-    });
-  });
-}
-
-/**
- * 7. Security Hardening for External Links
- */
-function initExternalLinks() {
-  const externalLinks = document.querySelectorAll('a[href^="http"]');
-
-  externalLinks.forEach(link => {
-    if (!link.hasAttribute('rel')) {
-      link.setAttribute('rel', 'noopener noreferrer');
     }
-  });
-}
+
+    function announce(text) {
+      if (!toast || !msg) return;
+      msg.textContent = text;
+      toast.hidden = false;
+      window.clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(() => {
+        toast.hidden = true;
+      }, 2800);
+    }
+  }
+
+  function initExternalLinks() {
+    document.querySelectorAll('a[href^="http"]').forEach((link) => {
+      link.setAttribute("target", "_blank");
+      const rel = new Set((link.getAttribute("rel") || "").split(/\s+/).filter(Boolean));
+      rel.add("noopener");
+      rel.add("noreferrer");
+      link.setAttribute("rel", Array.from(rel).join(" "));
+    });
+  }
+
+  function initSmoothScroll() {
+    document.querySelectorAll('a[href^="#"]').forEach((link) => {
+      link.addEventListener("click", (event) => {
+        const id = link.getAttribute("href");
+        if (!id || id === "#") return;
+        const target = document.querySelector(id);
+        if (!target) return;
+        event.preventDefault();
+        const top = target.getBoundingClientRect().top + window.scrollY - 72;
+        window.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
+        if (typeof target.focus === "function") {
+          target.setAttribute("tabindex", "-1");
+          target.focus({ preventScroll: true });
+        }
+      });
+    });
+  }
+
+  function initRevealFallback() {
+    const nodes = document.querySelectorAll(".reveal, .filmstrip .frame");
+    if (!nodes.length || !("IntersectionObserver" in window)) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.style.opacity = "1";
+          entry.target.style.transform = "none";
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.16 }
+    );
+
+    nodes.forEach((el) => {
+      el.style.opacity = "0.35";
+      el.style.transform = "translateY(12px)";
+      el.style.transition = "opacity 420ms ease, transform 420ms ease";
+      observer.observe(el);
+    });
+  }
+})();
